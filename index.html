@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USDC 歷史數據監控</title>
+    <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
+    <style>
+        body { font-family: sans-serif; background: #1a1a1a; color: white; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        #chart-container { width: 100%; max-width: 800px; height: 450px; background: #242424; border-radius: 8px; margin-top: 20px; position: relative; }
+        .info { text-align: center; }
+        #msg { color: #aaa; font-size: 14px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+<div class="info">
+    <h2>USDC 歷史發行量 (90天趨勢)</h2>
+    <div id="msg">正在初始化圖表...</div>
+</div>
+
+<div id="chart-container"></div>
+
+<script>
+    const msg = document.getElementById('msg');
+    
+    // 確保 LightweightCharts 已經載入
+    window.onload = function() {
+        if (typeof LightweightCharts === 'undefined') {
+            msg.innerText = "錯誤：無法載入圖表庫，請檢查網路連線。";
+            return;
+        }
+
+        const container = document.getElementById('chart-container');
+        
+        // 2. 初始化圖表
+        const chart = LightweightCharts.createChart(container, {
+            layout: { background: { color: '#242424' }, textColor: '#d1d4dc' },
+            grid: { vertLines: { color: '#333' }, horzLines: { color: '#333' } },
+            timeScale: { borderColor: '#444' }
+        });
+
+        // 3. 使用 AreaSeries (這裡改用新版標準寫法)
+        const areaSeries = chart.addAreaSeries({
+            lineColor: '#2962FF',
+            topColor: 'rgba(41, 98, 255, 0.3)',
+            bottomColor: 'rgba(41, 98, 255, 0)',
+            lineWidth: 2,
+        });
+
+        async function loadData() {
+            msg.innerText = "正在從 CoinGecko 獲取數據...";
+            try {
+                // 使用備援 API 機制
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/usd-coin/market_chart?vs_currency=usd&days=90');
+                if (!response.ok) throw new Error('API 限制或失效');
+                
+                const data = await response.json();
+                
+                const formattedData = data.market_caps.map(item => ({
+                    time: Math.floor(item[0] / 1000), // 轉換為秒
+                    value: item[1]
+                }));
+
+                areaSeries.setData(formattedData);
+                chart.timeScale().fitContent();
+                msg.innerText = "數據更新成功 (來源: CoinGecko)";
+            } catch (e) {
+                msg.innerText = "數據加載失敗，可能是跨域限制(CORS)或請求太頻繁。";
+                console.error(e);
+            }
+        }
+
+        loadData();
+
+        // 響應式視窗大小
+        window.addEventListener('resize', () => {
+            chart.applyOptions({ width: container.clientWidth });
+        });
+    };
+</script>
+
+</body>
+</html>
