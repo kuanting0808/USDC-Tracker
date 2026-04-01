@@ -3,95 +3,158 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>USDC 監控</title>
+    <title>USDC 實時發行量監控</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
-        body { font-family: -apple-system, sans-serif; background: #121212; color: white; margin: 0; padding: 0; overflow-x: hidden; }
-        .container { display: flex; flex-direction: column; align-items: center; padding: 20px 10px; }
-        .header { text-align: center; margin-bottom: 20px; }
-        /* 顯示人類直覺數字的大字體 */
-        #current-supply { font-size: 2.5rem; font-weight: bold; color: #38bdf8; margin: 10px 0; }
-        #chart-container { width: 100vw; height: 350px; background: #1e1e1e; position: relative; }
-        .label { color: #888; font-size: 14px; }
-        #msg { font-size: 12px; color: #555; margin-top: 15px; }
+        /* 針對手機深色模式設計的 CSS */
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+            background: #121212; 
+            color: white; 
+            margin: 0; 
+            padding: 0; 
+            overflow-x: hidden; 
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header-card { 
+            width: 100%;
+            max-width: 600px;
+            text-align: center; 
+            padding: 30px 0 20px 0;
+            background: linear-gradient(180deg, #1e1e1e 0%, #121212 100%);
+        }
+        .label { color: #888; font-size: 14px; letter-spacing: 1px; }
+        #current-supply { 
+            font-size: 2.8rem; 
+            font-weight: 800; 
+            color: #38bdf8; 
+            margin: 10px 0;
+            text-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+        }
+        #chart-container { 
+            width: 100vw; 
+            height: 400px; 
+            background: #121212; 
+        }
+        .footer {
+            padding: 20px;
+            font-size: 12px;
+            color: #444;
+            text-align: center;
+        }
+        #status-msg { color: #555; }
     </style>
 </head>
 <body>
 
-<div class="container">
-    <div class="header">
-        <div class="label">USDC 目前發行量</div>
-        <div id="current-supply">載入中...</div>
-        <div class="label">過去 90 天趨勢</div>
-    </div>
+<div class="header-card">
+    <div class="label">USDC 目前發行量 (TOTAL SUPPLY)</div>
+    <div id="current-supply">載入中...</div>
+    <div class="label">過去 120 天趨勢圖</div>
 </div>
 
 <div id="chart-container"></div>
 
-<div class="container">
-    <div id="msg">正在連接數據源...</div>
+<div class="footer">
+    <div id="status-msg">正在從區塊鏈數據源獲取實時數據...</div>
+    <p>© 2026 USDC Monitor Portfolio</p>
 </div>
 
 <script>
     const supplyEl = document.getElementById('current-supply');
-    const msgEl = document.getElementById('msg');
+    const msgEl = document.getElementById('status-msg');
     const container = document.getElementById('chart-container');
 
-    // 人類直覺數字格式化函數 (Billion / Million)
-    function formatHumanReadable(num) {
+    // 人類直覺數字格式化 (例如 32,456,123,456 -> 32.46 B)
+    function formatToBillion(num) {
         if (num >= 1e9) {
-            return (num / 1e9).toFixed(2) + ' B'; // 十億
+            return (num / 1e9).toFixed(2) + ' B';
         } else if (num >= 1e6) {
-            return (num / 1e6).toFixed(2) + ' M'; // 百萬
+            return (num / 1e6).toFixed(2) + ' M';
         }
         return num.toLocaleString();
     }
 
     window.onload = function() {
-        // 初始化圖表，寬度設為當前視窗寬度
+        // 1. 初始化圖表設定
         const chart = LightweightCharts.createChart(container, {
             width: window.innerWidth,
-            height: 350,
-            layout: { background: { color: '#121212' }, textColor: '#d1d4dc' },
-            grid: { vertLines: { color: '#222' }, horzLines: { color: '#222' } },
-            timeScale: { borderColor: '#333' },
+            height: 400,
+            layout: { 
+                background: { color: '#121212' }, 
+                textColor: '#94a3b8',
+                fontSize: 12
+            },
+            grid: { 
+                vertLines: { color: '#1f2937' }, 
+                horzLines: { color: '#1f2937' } 
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+                vertLine: { color: '#38bdf8', labelBackgroundColor: '#38bdf8' },
+                horzLine: { color: '#334155', labelBackgroundColor: '#334155' }
+            },
+            timeScale: { 
+                borderColor: '#334155',
+                timeVisible: true,
+                secondsVisible: false
+            },
             rightPriceScale: { 
-                borderColor: '#333',
-                axisLabelVisible: true,
+                borderColor: '#334155',
+                autoScale: true
             }
         });
 
+        // 2. 建立面積圖系列
         const areaSeries = chart.addAreaSeries({
             lineColor: '#38bdf8',
-            topColor: 'rgba(56, 189, 248, 0.3)',
+            topColor: 'rgba(56, 189, 248, 0.4)',
             bottomColor: 'rgba(56, 189, 248, 0)',
-            lineWidth: 2,
+            lineWidth: 3,
+            // 將右側座標軸數字也顯示為 B
+            priceFormat: {
+                type: 'custom',
+                minMove: 0.01,
+                formatter: price => (price / 1e9).toFixed(2) + ' B',
+            },
         });
 
-        // 核心功能：自動縮放
+        // 3. 自動縮放功能
         window.addEventListener('resize', () => {
             chart.applyOptions({ width: window.innerWidth });
         });
 
+        // 4. 獲取數據 (設定為 120 天)
         async function loadData() {
             try {
-                const response = await fetch('https://api.coingecko.com/api/v3/coins/usd-coin/market_chart?vs_currency=usd&days=90');
+                // days=120
+                const response = await fetch('https://api.coingecko.com/api/v3/coins/usd-coin/market_chart?vs_currency=usd&days=120');
+                
+                if (!response.ok) throw new Error('API 請求過於頻繁');
+                
                 const data = await response.json();
                 
+                // 轉換格式 [timestamp, value]
                 const formattedData = data.market_caps.map(item => ({
                     time: Math.floor(item[0] / 1000),
                     value: item[1]
                 }));
 
-                // 顯示最後一筆數據（當前發行量）
+                // 顯示上方大數字 (最後一筆數據)
                 const latestValue = formattedData[formattedData.length - 1].value;
-                supplyEl.innerText = '$ ' + formatHumanReadable(latestValue);
+                supplyEl.innerText = '$ ' + formatToBillion(latestValue);
 
+                // 更新圖表數據
                 areaSeries.setData(formattedData);
                 chart.timeScale().fitContent();
-                msgEl.innerText = "最後更新: " + new Date().toLocaleTimeString();
+                
+                msgEl.innerText = "數據更新成功: " + new Date().toLocaleString();
             } catch (e) {
-                msgEl.innerText = "連線失敗，請稍後再試。";
+                console.error(e);
+                msgEl.innerText = "連線失敗，請稍後刷新網頁 (CORS 或 API 限制)。";
+                msgEl.style.color = "#f87171";
             }
         }
 
