@@ -3,79 +3,93 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>穩定幣流動性監控</title>
+    <title>穩定幣流動性對照</title>
     <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
     <style>
         body { font-family: -apple-system, sans-serif; background: #0f172a; color: white; margin: 0; padding: 0; }
-        .dashboard { display: flex; flex-direction: column; align-items: center; padding: 20px 15px; }
-        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; width: 100%; max-width: 600px; margin-bottom: 20px; }
-        .stat-box { background: #1e293b; padding: 15px; border-radius: 12px; text-align: center; border: 1px solid #334155; }
-        .label { font-size: 12px; color: #94a3b8; margin-bottom: 5px; }
-        .value { font-size: 1.5rem; font-weight: bold; }
-        .usdc-text { color: #38bdf8; }
-        .usdt-text { color: #22c55e; }
+        .dashboard { padding: 20px 15px; display: flex; flex-direction: column; align-items: center; }
+        .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; width: 100%; max-width: 600px; margin-bottom: 15px; }
+        .stat-box { background: #1e293b; padding: 12px; border-radius: 10px; text-align: center; border-left: 4px solid #ccc; }
+        .usdc-border { border-left-color: #38bdf8; }
+        .usdt-border { border-left-color: #22c55e; }
+        .label { font-size: 11px; color: #94a3b8; margin-bottom: 4px; }
+        .value { font-size: 1.4rem; font-weight: bold; }
         
-        /* 比例條樣式 */
-        .ratio-container { width: 100%; max-width: 600px; margin-bottom: 25px; }
-        .ratio-bar { height: 12px; background: #22c55e; border-radius: 6px; overflow: hidden; display: flex; margin-top: 8px; }
-        #usdc-fill { height: 100%; background: #38bdf8; transition: width 1s ease; }
-        .ratio-labels { display: flex; justify-content: space-between; font-size: 12px; margin-top: 5px; color: #94a3b8; }
+        /* 比例條 */
+        .ratio-wrapper { width: 100%; max-width: 600px; margin-bottom: 20px; }
+        .ratio-bar { height: 8px; background: #22c55e; border-radius: 4px; overflow: hidden; display: flex; margin-top: 6px; }
+        #usdc-fill { height: 100%; background: #38bdf8; transition: width 0.8s; }
+        .ratio-text { display: flex; justify-content: space-between; font-size: 11px; color: #64748b; }
 
-        #chart-container { width: 100vw; height: 400px; background: #0f172a; }
-        .footer { padding: 20px; font-size: 11px; color: #475569; text-align: center; }
+        #chart-container { width: 100vw; height: 420px; background: #0f172a; }
+        .legend { font-size: 12px; display: flex; gap: 15px; margin-top: 10px; color: #94a3b8; }
+        .legend span::before { content: '●'; margin-right: 5px; }
     </style>
 </head>
 <body>
 
 <div class="dashboard">
     <div class="stats-grid">
-        <div class="stat-box">
-            <div class="label">USDC 發行量</div>
-            <div id="usdc-val" class="value usdc-text">--</div>
+        <div class="stat-box usdc-border">
+            <div class="label">USDC (左軸)</div>
+            <div id="usdc-val" class="value" style="color:#38bdf8">--</div>
         </div>
-        <div class="stat-box">
-            <div class="label">USDT 發行量</div>
-            <div id="usdt-val" class="value usdt-text">--</div>
+        <div class="stat-box usdt-border">
+            <div class="label">USDT (右軸)</div>
+            <div id="usdt-val" class="value" style="color:#22c55e">--</div>
         </div>
     </div>
 
-    <div class="ratio-container">
-        <div class="ratio-labels">
-            <span>USDC 佔比: <span id="usdc-pct">--</span>%</span>
-            <span>USDT 佔比: <span id="usdt-pct">--</span>%</span>
+    <div class="ratio-wrapper">
+        <div class="ratio-text">
+            <span>USDC: <span id="usdc-pct">--</span>%</span>
+            <span>USDT: <span id="usdt-pct">--</span>%</span>
         </div>
-        <div class="ratio-bar">
-            <div id="usdc-fill" style="width: 50%"></div>
-        </div>
+        <div class="ratio-bar"><div id="usdc-fill" style="width: 30%"></div></div>
     </div>
 </div>
 
 <div id="chart-container"></div>
 
-<div class="footer">
-    顯示過去 120 天數據趨勢 (藍色: USDC, 綠色: USDT)<br>
-    <span id="status">數據加載中...</span>
+<div class="dashboard">
+    <div class="legend">
+        <span style="color:#38bdf8">USDC 趨勢</span>
+        <span style="color:#22c55e">USDT 趨勢</span>
+    </div>
+    <div id="status" style="font-size:10px; color:#475569; margin-top:15px;">數據更新中...</div>
 </div>
 
 <script>
     const container = document.getElementById('chart-container');
-    const statusEl = document.getElementById('status');
-
-    function toB(num) { return (num / 1e9).toFixed(2) + ' B'; }
+    const toB = num => (num / 1e9).toFixed(2) + ' B';
 
     window.onload = function() {
+        // 初始化圖表：開啟左邊與右邊的座標軸
         const chart = LightweightCharts.createChart(container, {
             width: window.innerWidth,
-            height: 400,
+            height: 420,
             layout: { background: { color: '#0f172a' }, textColor: '#94a3b8' },
             grid: { vertLines: { color: '#1e293b' }, horzLines: { color: '#1e293b' } },
-            timeScale: { borderColor: '#334155' },
-            rightPriceScale: { borderColor: '#334155' }
+            leftPriceScale: { visible: true, borderColor: '#334155' },
+            rightPriceScale: { visible: true, borderColor: '#334155' },
+            timeScale: { borderColor: '#334155' }
         });
 
-        // 建立兩條線
-        const usdcSeries = chart.addLineSeries({ color: '#38bdf8', lineWidth: 2, priceFormat: { type: 'custom', formatter: v => (v/1e9).toFixed(1)+'B' } });
-        const usdtSeries = chart.addLineSeries({ color: '#22c55e', lineWidth: 2, priceFormat: { type: 'custom', formatter: v => (v/1e9).toFixed(1)+'B' } });
+        // 建立 USDC 線條，綁定到左軸 (left)
+        const usdcSeries = chart.addLineSeries({ 
+            color: '#38bdf8', 
+            lineWidth: 2, 
+            priceScaleId: 'left',
+            priceFormat: { type: 'custom', formatter: v => (v/1e9).toFixed(0)+'B' }
+        });
+
+        // 建立 USDT 線條，綁定到右軸 (right)
+        const usdtSeries = chart.addLineSeries({ 
+            color: '#22c55e', 
+            lineWidth: 2, 
+            priceScaleId: 'right',
+            priceFormat: { type: 'custom', formatter: v => (v/1e9).toFixed(0)+'B' }
+        });
 
         window.addEventListener('resize', () => chart.applyOptions({ width: window.innerWidth }));
 
@@ -91,13 +105,14 @@
 
                 usdcSeries.setData(usdcData);
                 usdtSeries.setData(usdtData);
+                
+                // 自動調整兩邊的縮放比例
                 chart.timeScale().fitContent();
 
                 const v1 = usdcData[usdcData.length-1].value;
                 const v2 = usdtData[usdtData.length-1].value;
                 const total = v1 + v2;
 
-                // 更新文字與比例
                 document.getElementById('usdc-val').innerText = '$' + toB(v1);
                 document.getElementById('usdt-val').innerText = '$' + toB(v2);
                 
@@ -108,9 +123,9 @@
                 document.getElementById('usdt-pct').innerText = p2;
                 document.getElementById('usdc-fill').style.width = p1 + '%';
 
-                statusEl.innerText = "最後更新: " + new Date().toLocaleString();
+                document.getElementById('status').innerText = "最後更新: " + new Date().toLocaleString();
             } catch (e) {
-                statusEl.innerText = "API 限制，請稍後刷新。";
+                document.getElementById('status').innerText = "載入失敗，請稍後再試。";
             }
         }
 
